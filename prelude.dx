@@ -811,14 +811,29 @@ def codepoint (c:Char) : Int8 = %codePoint c
 @instance charOrd : Ord Char = (MkOrd charEq (\x y. codepoint x > codepoint y)
                                              (\x y. codepoint x < codepoint y))
 
-
 def showFloat' (x:Float) : String =
   (n, ptr) = %ffi showFloat (Int & CharPtr) x
   AsList n $ for i:(Fin n).
     MkChar $ %ptrLoad (%ptrOffset ptr (ordinal i))
 
+def showInt32' (x:Int32) : String =
+  (n, ptr) = %ffi showInt32 (Int & CharPtr) x
+  AsList n $ for i:(Fin n).
+    MkChar $ %ptrLoad (%ptrOffset ptr (ordinal i))
+
+def showInt64' (x:Int64) : String =
+  (n, ptr) = %ffi showInt64 (Int & CharPtr) x
+  AsList n $ for i:(Fin n).
+    MkChar $ %ptrLoad (%ptrOffset ptr (ordinal i))
+
 instance showFloat : Show Float where
   show = showFloat'
+
+instance showInt32 : Show Int32 where
+  show = showInt32'
+
+instance showInt64 : Show Int64 where
+  show = showInt64'
 
 '## Floating point helper functions
 
