@@ -11,9 +11,11 @@
 #include <thread>
 #include <vector>
 
+#include <inttypes.h>
+
 #ifdef DEX_CUDA
 #include <cuda.h>
-#endif
+#endif // DEX_CUDA
 
 extern "C" {
 
@@ -138,6 +140,24 @@ double randunif(uint64_t keypair) {
   return out - 1;
 }
 
+void showInt32(char **resultPtr, int32_t x) {
+  auto p = reinterpret_cast<char*>(malloc_dex(100));
+  auto n = sprintf(p, "%" PRId32, x);
+  auto result1Ptr = reinterpret_cast<int32_t*>(resultPtr[0]);
+  auto result2Ptr = reinterpret_cast<char**>(  resultPtr[1]);
+  *result1Ptr = n;
+  *result2Ptr = p;
+}
+
+void showInt64(char **resultPtr, int64_t x) {
+  auto p = reinterpret_cast<char*>(malloc_dex(100));
+  auto n = sprintf(p, "%" PRId64, x);
+  auto result1Ptr = reinterpret_cast<int32_t*>(resultPtr[0]);
+  auto result2Ptr = reinterpret_cast<char**>(  resultPtr[1]);
+  *result1Ptr = n;
+  *result2Ptr = p;
+}
+
 void showFloat(char **resultPtr, float x) {
   auto p = reinterpret_cast<char*>(malloc_dex(100));
   auto n = sprintf(p, "%.4f", x);
@@ -258,7 +278,7 @@ void dex_ensure_has_cuda_context() {
 
 #undef CHECK
 
-#endif
+#endif // DEX_CUDA
 
 int32_t dex_queryParallelismMC(int64_t iters) {
   int32_t nthreads = std::thread::hardware_concurrency();

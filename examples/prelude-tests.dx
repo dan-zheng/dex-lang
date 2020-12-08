@@ -1,0 +1,52 @@
+'# Prelude tests
+
+'Tests simple prelude functionality.
+
+'## `show` instances
+
+-- Int32
+
+:p show (1234: Int32)
+> (AsList 4 ['1', '2', '3', '4'])
+
+:p show (-1234: Int32)
+> (AsList 5 ['-', '1', '2', '3', '4'])
+
+:p show ((FToI (-(pow 2. 31.))): Int32)
+> (AsList 11 ['-', '2', '1', '4', '7', '4', '8', '3', '6', '4', '8'])
+
+-- Int64
+
+:p show (IToI64 1234: Int64)
+> (AsList 4 ['1', '2', '3', '4'])
+
+-- FIXME(https://github.com/google-research/dex-lang/issues/317):
+-- Unexpected underflow from type conversion of negative integer literal.
+:p show (IToI64 (-1234): Int64)
+> (AsList 10 ['4', '2', '9', '4', '9', '6', '6', '0', '6', '2'])
+
+-- Float32
+
+:p show (123.456789: Float32)
+> (AsList 8 ['1', '2', '3', '.', '4', '5', '6', '8'])
+
+:p show ((pow 2. 16.): Float32)
+> (AsList 10 ['6', '5', '5', '3', '6', '.', '0', '0', '0', '0'])
+
+-- FIXME(https://github.com/google-research/dex-lang/issues/316):
+-- Unparenthesized expression with type ascription does not parse.
+-- :p show (nan: Float32)
+
+:p show ((nan): Float32)
+> (AsList 3 ['n', 'a', 'n'])
+
+-- Note: `show nan` appears different from `:p nan`.
+:p nan
+> NaN
+
+:p show ((infinity): Float32)
+> (AsList 3 ['i', 'n', 'f'])
+
+-- Note: `show infinity` appears different from `:p infinity`.
+:p infinity
+> Infinity
