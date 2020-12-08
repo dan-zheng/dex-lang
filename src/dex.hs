@@ -4,8 +4,6 @@
 -- license that can be found in the LICENSE file or at
 -- https://developers.google.com/open-source/licenses/bsd
 
-{-# LANGUAGE DeriveGeneric #-}
-
 import System.Console.Haskeline
 import System.Exit
 import Control.Monad
@@ -13,8 +11,7 @@ import Control.Monad.State.Strict
 import Options.Applicative
 import System.Posix.Terminal (queryTerminal)
 import System.Posix.IO (stdOutput)
-import System.Exit
-import System.Directory
+import System.Directory ( getModificationTime )
 
 import Syntax
 import PPrint
@@ -110,6 +107,7 @@ printLitProg JSONDoc prog =
     "{}" -> return ()
     s -> putStrLn s
 
+nonEmptyNewline :: [Char] -> [Char]
 nonEmptyNewline [] = []
 nonEmptyNewline l  = l ++ ['\n']
 

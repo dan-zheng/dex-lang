@@ -430,7 +430,7 @@ pattern Pure :: EffectRow
 pattern Pure = EffectRow [] Nothing
 
 pattern NoEffects :: EffectSummary
-pattern NoEffects <- ((S.null) -> True)
+pattern NoEffects <- (S.null -> True)
   where NoEffects = mempty
 
 instance Eq EffectRow where

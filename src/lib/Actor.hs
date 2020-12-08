@@ -43,7 +43,7 @@ runActor (Actor m) = do
   linksRef   <- newIORef []
   chan <- newBackChan
   tid <- myThreadId
-  let p = (Proc Trap tid (asErrPChan chan))
+  let p = Proc Trap tid (asErrPChan chan)
   runReaderT m (ActorConfig p chan linksRef)
 
 subChan :: (a -> b) -> PChan b -> PChan a

@@ -60,8 +60,18 @@ alias dex="stack exec --stack-yaml=stack-macos.yaml dex --"
   * Live-updated notebook display `dex web examples/pi.dx` (html) or `dex watch
     examples/pi.dx` (terminal).
 
+## Development
+
+### Visual Studio Code
+
+Install the [Haskell for Visual Studio Code][] extension. This extension is
+recommended because it automatically installs correctly versioned dependencies
+based on `hie.yaml`, which is based on `stack.yaml`.
+
 ## License
 
 BSD-3
 
 This is an early-stage research project, not an official Google product.
+
+[Haskell for Visual Studio Code]: https://marketplace.visualstudio.com/items?itemName=haskell.haskell
