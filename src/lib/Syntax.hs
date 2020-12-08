@@ -214,9 +214,9 @@ data UExpr' = UVar UVar
             | UDecl UDecl UExpr
             | UFor Direction UPatAnn UExpr
             | UCase UExpr [UAlt]
-            | UHole
-            | UTypeAnn UExpr UExpr
-            | UTabCon [UExpr]
+            | UHole                                     -- _ (underscore)
+            | UTypeAnn UExpr UExpr                      -- a:X
+            | UTabCon [UExpr]                           -- [a, b, c, ...]
             | UIndexRange (Limit UExpr) (Limit UExpr)
             | UPrimExpr (PrimExpr UExpr)
             | URecord (ExtLabeledItems UExpr UExpr)     -- {a=x, b=y, ...rest}
