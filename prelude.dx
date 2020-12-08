@@ -801,15 +801,15 @@ String : Type = List Char
 
 CharPtr : Type = %CharPtr
 
-interface Show a:Type where
-  show : a -> String
-
 -- TODO. This is ASCII code point. It really should be Int32 for Unicode codepoint 
 def codepoint (c:Char) : Int8 = %codePoint c
 
 @instance charEq  : Eq Char  = MkEq \x y. codepoint x == codepoint y
 @instance charOrd : Ord Char = (MkOrd charEq (\x y. codepoint x > codepoint y)
                                              (\x y. codepoint x < codepoint y))
+
+interface Show a:Type where
+  show : a -> String
 
 def showInt32' (x:Int32) : String =
   (n, ptr) = %ffi showInt32 (Int & CharPtr) x
@@ -821,8 +821,13 @@ def showInt64' (x:Int64) : String =
   AsList n $ for i:(Fin n).
     MkChar $ %ptrLoad (%ptrOffset ptr (ordinal i))
 
-def showFloat' (x:Float) : String =
-  (n, ptr) = %ffi showFloat (Int & CharPtr) x
+def showFloat32' (x:Float32) : String =
+  (n, ptr) = %ffi showFloat32 (Int & CharPtr) x
+  AsList n $ for i:(Fin n).
+    MkChar $ %ptrLoad (%ptrOffset ptr (ordinal i))
+
+def showFloat64' (x:Float64) : String =
+  (n, ptr) = %ffi showFloat64 (Int & CharPtr) x
   AsList n $ for i:(Fin n).
     MkChar $ %ptrLoad (%ptrOffset ptr (ordinal i))
 
@@ -832,8 +837,11 @@ instance showInt32 : Show Int32 where
 instance showInt64 : Show Int64 where
   show = showInt64'
 
-instance showFloat : Show Float where
-  show = showFloat'
+instance showFloat32 : Show Float32 where
+  show = showFloat32'
+
+instance showFloat64 : Show Float64 where
+  show = showFloat64'
 
 '## Floating point helper functions
 

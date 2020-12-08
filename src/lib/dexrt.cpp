@@ -158,7 +158,16 @@ void showInt64(char **resultPtr, int64_t x) {
   *result2Ptr = p;
 }
 
-void showFloat(char **resultPtr, float x) {
+void showFloat32(char **resultPtr, float x) {
+  auto p = reinterpret_cast<char*>(malloc_dex(100));
+  auto n = sprintf(p, "%.4f", x);
+  auto result1Ptr = reinterpret_cast<int32_t*>(resultPtr[0]);
+  auto result2Ptr = reinterpret_cast<char**>(  resultPtr[1]);
+  *result1Ptr = n;
+  *result2Ptr = p;
+}
+
+void showFloat64(char **resultPtr, double x) {
   auto p = reinterpret_cast<char*>(malloc_dex(100));
   auto n = sprintf(p, "%.4f", x);
   auto result1Ptr = reinterpret_cast<int32_t*>(resultPtr[0]);
