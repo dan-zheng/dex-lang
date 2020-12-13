@@ -29,7 +29,7 @@ module Syntax (
     ImpModule (..), ImpBlock (..), ImpFunction (..), ImpDecl (..),
     IExpr (..), IVal, ImpInstr (..), Backend (..), Device (..),
     IPrimOp, IVar, IBinder, IType, SetVal (..), MonMap (..), LitProg,
-    IFunType (..), IFunVar, CallingConvention (..),
+    IFunType (..), IFunVar, CallingConvention (..), IsCUDARequired (..),
     UAlt (..), AltP, Alt, Label, LabeledItems (..), labeledSingleton,
     reflectLabels, withLabels, ExtLabeledItems (..), prefixExtLabeledItems,
     IScope, BinderInfo (..), Bindings, CUDAKernel (..), BenchStats,
@@ -82,7 +82,7 @@ import Foreign.Ptr
 import GHC.Generics
 
 import Env
-import Util (enumerate, (...))
+import Util (IsBool (..), enumerate, (...))
 
 -- === core IR ===
 
@@ -354,12 +354,13 @@ data PrimHof e =
       | RunReader e e
       | RunWriter e
       | RunState  e e
+      | RunExcept e
       | Linearize e
       | Transpose e
       | PTileReduce e e       -- index set, thread body
         deriving (Show, Eq, Generic, Functor, Foldable, Traversable)
 
-data PrimEffect e = MAsk | MTell e | MGet | MPut e
+data PrimEffect e = MAsk | MTell e | MGet | MPut e | MThrow e
     deriving (Show, Eq, Generic, Functor, Foldable, Traversable)
 
 data BinOp = IAdd | ISub | IMul | IDiv | ICmp CmpOp
@@ -411,7 +412,7 @@ showPrimName prim = primNameToStr $ fmap (const ()) prim
 type Effect = (EffectName, Name)
 data EffectRow = EffectRow [Effect] (Maybe Name)
                  deriving (Show, Generic)
-data EffectName = Reader | Writer | State  deriving (Show, Eq, Ord, Generic)
+data EffectName = Reader | Writer | State | Except  deriving (Show, Eq, Ord, Generic)
 
 type EffectSummary = S.Set Effect
 
@@ -422,7 +423,7 @@ instance Subst EffectSummary where
   subst (env, _) effs = S.map substEff effs
     where
       substEff (eff, name) = case envLookup env name of
-        Just ~(Var (name':>_)) -> (eff, name')
+        Just (Var (name':>_)) -> (eff, name')
         Nothing               -> (eff, name)
 
 pattern Pure :: EffectRow
@@ -482,8 +483,15 @@ type Size = IExpr
 type IFunVar = VarP IFunType
 data IFunType = IFunType CallingConvention [IType] [IType] -- args, results
                 deriving (Show)
+
+data IsCUDARequired = CUDARequired | CUDANotRequired  deriving Show
+
+instance IsBool IsCUDARequired where
+  toBool CUDARequired = True
+  toBool CUDANotRequired = False
+
 data CallingConvention = CEntryFun
-                       | EntryFun Bool  -- flag indicates whether CUDA required
+                       | EntryFun IsCUDARequired
                        | FFIFun
                        | FFIMultiResultFun
                        | CUDAKernelLaunch
@@ -1152,7 +1160,11 @@ substName :: SubstEnv -> Name -> Name
 substName env v = case envLookup env (v:>()) of
   Nothing -> v
   Just (Var (v':>_)) -> v'
-  _ -> error "Should only substitute with a name"
+  Just (TC (BaseType (Scalar Float32Type))) ->
+    v
+    -- error $ "Found: " ++ show x
+  Just x -> error $ "Blah: " ++ show x
+  _ -> error $ "Should only substitute with a name:\n" ++ show v ++ "\n" ++ show env
 
 extendEffRow :: [Effect] -> EffectRow -> EffectRow
 extendEffRow effs (EffectRow effs' t) = EffectRow (effs <> effs') t
@@ -1472,6 +1484,7 @@ builtinNames = M.fromList
   , ("tell"       , OpExpr $ PrimEffect () $ MTell ())
   , ("get"        , OpExpr $ PrimEffect () $ MGet)
   , ("put"        , OpExpr $ PrimEffect () $ MPut  ())
+  , ("throw"      , OpExpr $ PrimEffect () $ MThrow ())
   , ("indexRef"   , OpExpr $ IndexRef () ())
   , ("inject"     , OpExpr $ Inject ())
   , ("select"     , OpExpr $ Select () () ())
@@ -1481,6 +1494,7 @@ builtinNames = M.fromList
   , ("runReader"       , HofExpr $ RunReader () ())
   , ("runWriter"       , HofExpr $ RunWriter    ())
   , ("runState"        , HofExpr $ RunState  () ())
+  , ("runExcept"       , HofExpr $ RunExcept    ())
   , ("tiled"           , HofExpr $ Tile 0 () ())
   , ("tiledd"          , HofExpr $ Tile 1 () ())
   , ("TyKind"  , TCExpr $ TypeKind)

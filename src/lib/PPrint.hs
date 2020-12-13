@@ -630,6 +630,7 @@ instance Pretty EffectName where
     Reader -> "Read"
     Writer -> "Accum"
     State  -> "State"
+    Except -> "Except"
 
 instance Pretty eff => Pretty (ArrowP eff) where
   pretty arr = case arr of

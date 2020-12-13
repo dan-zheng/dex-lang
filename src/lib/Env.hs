@@ -168,7 +168,7 @@ isGlobal _ = False
 isGlobalBinder :: BinderP ann -> Bool
 isGlobalBinder b = isGlobal $ fromBind "" b
 
-genFresh :: Name-> Env a -> Name
+genFresh :: Name -> Env a -> Name
 genFresh (Name ns tag _) (Env m) = Name ns tag nextNum
   where
     nextNum = case M.lookupLT (Name ns tag bigInt) m of

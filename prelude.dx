@@ -223,7 +223,6 @@ def BToI (x:Bool) : Int  =
 
 def BToF (x:Bool) : Float = IToF (BToI x)
 def todo (a:Type) ?-> : a = %throwError a
-def throw (a:Type) ?-> : a = %throwError a
 
 'Effects
 
@@ -401,7 +400,7 @@ def unsafeFromOrdinal (n : Type) (i : Int) : n = %unsafeFromOrdinal n i
 def fromOrdinal (n:Type) (i:Int) : n =
   case (0 <= i) && (i < size n) of
     True  -> unsafeFromOrdinal _ i
-    False -> throw
+    False -> todo
 
 def asidx (n:Type) ?-> (i:Int) : n = fromOrdinal n i
 def (@) (i:Int) (n:Type) : n = fromOrdinal n i
@@ -1062,7 +1061,7 @@ def ptrToTab (n:Int) (ptr:Ptr Float) : Fin n => Float =
 def castTable (m:Type) (xs:n=>a) : m=>a =
   case size m == size n of
      True  -> for i. xs.(unsafeFromOrdinal _ (ordinal i))
-     False -> throw
+     False -> todo
 
 def toList (n:Type) ?-> (xs:n=>a) : List a =
   n' = size n

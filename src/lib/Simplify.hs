@@ -454,16 +454,21 @@ simplifyHof hof = case hof of
   RunReader r lam -> do
     r' <- simplifyAtom r
     ~(lam', recon) <- simplifyBinaryLam lam
-    applyRecon recon =<< (emit $ Hof $ RunReader r' lam')
+    applyRecon recon =<< emit (Hof $ RunReader r' lam')
   RunWriter lam -> do
     ~(lam', recon) <- simplifyBinaryLam lam
-    (ans, w) <- fromPair =<< (emit $ Hof $ RunWriter lam')
+    (ans, w) <- fromPair =<< emit (Hof $ RunWriter lam')
     ans' <- applyRecon recon ans
     return $ PairVal ans' w
   RunState s lam -> do
     s' <- simplifyAtom s
     ~(lam', recon) <- simplifyBinaryLam lam
-    (ans, sOut) <- fromPair =<< (emit $ Hof $ RunState s' lam')
+    (ans, sOut) <- fromPair =<< emit (Hof $ RunState s' lam')
+    ans' <- applyRecon recon ans
+    return $ PairVal ans' sOut
+  RunExcept lam -> do
+    ~(lam', recon) <- simplifyBinaryLam lam
+    (ans, sOut) <- fromPair =<< emit (Hof $ RunExcept lam')
     ans' <- applyRecon recon ans
     return $ PairVal ans' sOut
   where

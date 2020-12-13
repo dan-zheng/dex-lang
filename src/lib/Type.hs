@@ -25,6 +25,7 @@ import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import Data.Text.Prettyprint.Doc
 import GHC.Stack
+import Debug.Trace
 
 import {-# SOURCE #-} Interpreter (indicesNoIO)
 import Syntax
@@ -247,10 +248,12 @@ exprEffs expr = case expr of
   App f _ -> functionEffs f
   Op op   -> case op of
     PrimEffect ref m -> case m of
-      MGet    -> S.singleton (State,  h)
-      MPut  _ -> S.singleton (State,  h)
-      MAsk    -> S.singleton (Reader, h)
-      MTell _ -> S.singleton (Writer, h)
+      MGet     -> S.singleton (State,  h)
+      MPut   _ -> S.singleton (State,  h)
+      MAsk     -> S.singleton (Reader, h)
+      MTell  _ -> S.singleton (Writer, h)
+      -- MThrow _ -> S.singleton (Except, h)
+      MThrow _ -> error "OH NO!"
       where RefTy (Var (h:>_)) _ = getType ref
     _ -> NoEffects
   Hof hof -> case hof of
@@ -262,6 +265,7 @@ exprEffs expr = case expr of
     RunReader _ f   -> handleRunner Reader f
     RunWriter   f   -> handleRunner Writer f
     RunState  _ f   -> handleRunner State  f
+    RunExcept   f   -> handleRunner Except f
     PTileReduce _ _ -> mempty
   Case _ alts _ -> foldMap (\(Abs _ block) -> blockEffs block) alts
   where
@@ -427,6 +431,7 @@ instance CoreVariant (PrimHof a) where
     RunReader _ _ -> alwaysAllowed
     RunWriter _   -> alwaysAllowed
     RunState  _ _ -> alwaysAllowed
+    RunExcept _   -> alwaysAllowed
     Linearize _   -> goneBy Simp
     Transpose _   -> goneBy Simp
     Tile _ _ _    -> alwaysAllowed
@@ -673,15 +678,17 @@ typeCheckOp op = case op of
       ParIndexRange ty _ _ -> return ty
       _ -> throw TypeErr $ "Unsupported inject argument type: " ++ pprint (TC tc)
   PrimEffect ref m -> do
-    TC (RefType h s) <- typeCheck ref
+    let ref2 = trace ("PRIMEFFECT REF FOUND: " ++ show ref) ref
+    TC (RefType h s) <- typeCheck ref2
     let h'' = case h of
                Just ~(Var (h':>TyKind)) -> Just h'
                Nothing -> Nothing
     case m of
-      MGet    ->         declareEff (State , h'') $> s
-      MPut  x -> x|:s >> declareEff (State , h'') $> UnitTy
-      MAsk    ->         declareEff (Reader, h'') $> s
-      MTell x -> x|:s >> declareEff (Writer, h'') $> UnitTy
+      MGet     ->         declareEff (State , h'') $> s
+      MPut   x -> x|:s >> declareEff (State , h'') $> UnitTy
+      MAsk     ->         declareEff (Reader, h'') $> s
+      MTell  x -> x|:s >> declareEff (Writer, h'') $> UnitTy
+      MThrow x -> x|:s >> declareEff (Except, h'') $> s
   IndexRef ref i -> do
     RefTy h (TabTyAbs a) <- typeCheck ref
     i |: absArgType a
@@ -839,6 +846,11 @@ typeCheckHof hof = case hof of
     (resultTy, stateTy) <- checkAction State f
     s |: stateTy
     return $ PairTy resultTy stateTy
+  RunExcept f -> uncurry PairTy <$> checkAction Except f
+  -- RunExcept f -> do
+  --   (resultTy, exceptTy) <- checkAction Except f
+  --   e |: exceptTy
+  --   return $ PairTy resultTy exceptTy
 
 checkAction :: EffectName -> Atom -> TypeM (Type, Type)
 checkAction effName f = do
