@@ -49,10 +49,10 @@ data NameSpace =
 type Tag = T.Text
 data VarP a = (:>) Name a  deriving (Show, Ord, Generic, Functor, Foldable, Traversable)
 data BinderP a = Ignore a | BindWithHint InlineHint (VarP a)
-                 deriving (Show, Generic, Functor, Foldable, Traversable)
+                 deriving (Eq, Ord, Show, Generic, Functor, Foldable, Traversable)
 
 data InlineHint = NoHint | CanInline | NoInline
-                  deriving (Show, Generic)
+                  deriving (Eq, Ord, Show, Generic)
 
 pattern Bind :: VarP a -> BinderP a
 pattern Bind v <- BindWithHint _ v
@@ -168,7 +168,7 @@ isGlobal _ = False
 isGlobalBinder :: BinderP ann -> Bool
 isGlobalBinder b = isGlobal $ fromBind "" b
 
-genFresh :: Name-> Env a -> Name
+genFresh :: Name -> Env a -> Name
 genFresh (Name ns tag _) (Env m) = Name ns tag nextNum
   where
     nextNum = case M.lookupLT (Name ns tag bigInt) m of

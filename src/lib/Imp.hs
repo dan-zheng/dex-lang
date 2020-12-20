@@ -252,6 +252,8 @@ toImpOp (maybeDest, op) = case op of
         -- than to go through a general purpose atom.
         copyAtom dest =<< destToAtom refDest
         destToAtom dest
+      MThrow x  -> copyAtom  refDest x >> returnVal UnitVal
+      -- MThrow x  -> error "Not implemented"
   UnsafeFromOrdinal n i -> returnVal =<< (intToIndex n $ fromScalarAtom i)
   IdxSetSize n -> returnVal . toScalarAtom  =<< indexSetSize n
   ToOrdinal idx -> case idx of
@@ -507,6 +509,12 @@ toImpHof env (maybeDest, hof) = do
       copyAtom sDest =<< impSubst env s
       void $ translateBlock (env <> ref @> sDest) (Just aDest, body)
       PairVal <$> destToAtom aDest <*> destToAtom sDest
+    RunExcept ~(BinaryFunVal _ ref _ body) -> do
+      (aDest, wDest) <- destPairUnpack <$> allocDest maybeDest resultTy
+      let RefTy _ wTy = getType ref
+      copyAtom wDest (zeroAt wTy)
+      void $ translateBlock (env <> ref @> wDest) (Just aDest, body)
+      PairVal <$> destToAtom aDest <*> destToAtom wDest
     Linearize _ -> error "Unexpected Linearize"
     Transpose _ -> error "Unexpected Transpose"
 

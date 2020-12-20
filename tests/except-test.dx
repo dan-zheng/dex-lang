@@ -1,0 +1,34 @@
+' # Exception effect
+
+-- No effect tail polymorphism
+-- def throw (a:Type) ?-> (e:Type) ?-> (x:e) : {Except e} a = todo
+-- def catch (a:Type) ?-> (e:Type) ?-> (handler:Unit -> {Except e} a) : (e|a) = todo
+
+def throw (a:Type) ?-> (e:Type) (x:e) : {Except e} a = todo
+def catch (a:Type) ?-> (e:Type) (handler:Unit -> {Except e} a) : (e|a) = todo
+
+-- def throw (eff:Effects) ?-> (a:Type) ?-> (e:Type) (x:e) : {Except e|eff} a = todo
+-- def catch (eff:Effects) ?-> (a:Type) ?-> (e:Type) (handler:Unit -> {Except e|eff} a) : (e|a) = todo
+
+-- %passes parse typed
+%passes
+def foo (x: Float) : Float = x
+
+%passes parse typed
+def safe_sqrt_body (x:Float) : {Except e} Float =
+-- def safe_sqrt_body (x:Float) : {Except Float} Float =
+  throw Float 0.
+  -- 0.
+  -- case x >= 0.0 of
+  --   True  -> sqrt x
+  --   -- False -> throw "Can't take square root of negative numbers!"
+  --   -- False -> throw "Can't take square root of negative numbers!"
+  --   False -> throw Float 0.
+
+%passes parse typed
+def safe_sqrt (x:Float) : (String|Float) = catch \().
+  case x >= 0.0 of
+    True  -> sqrt x
+    -- False -> throw "Can't take square root of negative numbers!"
+    -- False -> throw "Can't take square root of negative numbers!"
+    False -> throw 0.

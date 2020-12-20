@@ -25,7 +25,7 @@ module Embed (emit, emitTo, emitAnn, emitOp, buildDepEffLam, buildLamAux, buildP
               emitBlock, unzipTab, isSingletonType, emitDecl, withNameHint,
               singletonTypeVal, scopedDecls, embedScoped, extendScope, checkEmbed,
               embedExtend, unpackConsList, emitRunWriter, emitRunState,
-              emitRunReader, tabGet, SubstEmbedT, SubstEmbed, runSubstEmbedT,
+              emitRunReader, emitRunExcept, tabGet, SubstEmbedT, SubstEmbed, runSubstEmbedT,
               traverseAtom, ptrOffset, ptrLoad, evalBlockE, substTraversalDef,
               TraversalDef, traverseDecls, traverseDecl, traverseBlock, traverseExpr,
               clampPositive, buildNAbs, buildNAbsAux, buildNestedLam, zeroAt,
@@ -351,6 +351,10 @@ emitRunReader v x0 body = do
 emitRunState :: MonadEmbed m => Name -> Atom -> (Atom -> m Atom) -> m Atom
 emitRunState v x0 body = do
   emit . Hof . RunState x0 =<< mkBinaryEffFun State v (getType x0) body
+
+emitRunExcept :: MonadEmbed m => Name -> Type -> (Atom -> m Atom) -> m Atom
+emitRunExcept v ty body = do
+  emit . Hof . RunExcept =<< mkBinaryEffFun Except v ty body
 
 mkBinaryEffFun :: MonadEmbed m => EffectName -> Name -> Type -> (Atom -> m Atom) -> m Atom
 mkBinaryEffFun newEff v ty body = do

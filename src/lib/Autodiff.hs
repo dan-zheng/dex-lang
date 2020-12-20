@@ -125,10 +125,11 @@ linearizeOp op = case op of
   PrimEffect refArg m ->
     liftA2 PrimEffect (la refArg)
       (case m of
-         MAsk    -> pure MAsk
-         MTell x -> liftA MTell $ la x
-         MGet    -> pure MGet
-         MPut  x -> liftA MPut $ la x) `bindLin` emitOp
+         MAsk     -> pure MAsk
+         MTell x  -> liftA MTell $ la x
+         MGet     -> pure MGet
+         MPut  x  -> liftA MPut $ la x
+         MThrow x -> liftA MThrow $ la x) `bindLin` emitOp
   IndexRef ref i         -> (IndexRef <$> la ref <*> pure i) `bindLin` emitOp
   FstRef   ref           -> (FstRef   <$> la ref           ) `bindLin` emitOp
   SndRef   ref           -> (SndRef   <$> la ref           ) `bindLin` emitOp
@@ -259,6 +260,7 @@ linearizeHof env hof = case hof of
   RunWriter     lam -> linearizeEff Nothing    lam True  (const RunWriter) (emitRunWriter "r") Writer
   RunReader val lam -> linearizeEff (Just val) lam False RunReader         (emitRunReader "r") Reader
   RunState  val lam -> linearizeEff (Just val) lam True  RunState          (emitRunState  "r") State
+  RunExcept     lam -> linearizeEff Nothing    lam True  (const RunExcept) (emitRunExcept "r") Except
   -- TODO: Consider providing an upper bound for the number of while iterations as a hint.
   --       In the current form the best we can do is try to use some dynamically growing lists,
   --       but that won't work on the GPU.
@@ -676,6 +678,12 @@ transposeHof hof ct = case hof of
       localLinRegion h $ localLinRefSubst (b@>ref) $ transposeBlock body ctBody
       return UnitVal
     transposeAtom s cts
+  RunExcept ~(BinaryFunVal (Bind (h:>_)) b _ body) -> do
+    -- Probably cannot be differentiated
+    (ctBody, ctEff) <- fromPair ct
+    void $ emitRunReader "r" ctEff $ \ref -> do
+      localLinRegion h $ localLinRefSubst (b@>ref) $ transposeBlock body ctBody
+      return UnitVal
   Tile      _ _ _ -> notImplemented
   While       _ _ -> notImplemented
   Linearize     _ -> error "Unexpected linearization"

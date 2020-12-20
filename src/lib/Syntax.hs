@@ -8,6 +8,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE StrictData #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE PatternSynonyms #-}
@@ -16,7 +17,7 @@
 
 module Syntax (
     Type, Kind, BaseType (..), ScalarBaseType (..),
-    Effect, EffectName (..), EffectRow (..),
+    Effect, EffectRow (..),
     ClassName (..), TyQual (..), SrcPos, Var, Binder, Block (..), Decl (..),
     Expr (..), Atom (..), ArrowP (..), Arrow, PrimTC (..), Abs (..),
     PrimExpr (..), PrimCon (..), LitVal (..),
@@ -133,6 +134,10 @@ data DataDef = DataDef Name (Nest Binder) [DataConDef]  deriving (Show, Generic)
 data DataConDef = DataConDef Name (Nest Binder)    deriving (Show, Generic)
 
 data Abs b body = Abs b body               deriving (Show, Generic)
+
+-- deriving instance Eq b => Eq body => Eq (Abs b body)
+-- deriving instance Ord b => Ord body => Ord (Abs b body)
+
 data Nest a = Nest a (Nest a) | Empty
               deriving (Show, Generic, Functor, Foldable, Traversable)
 
@@ -145,7 +150,7 @@ data ArrowP eff = PlainArrow eff
                 | ClassArrow
                 | TabArrow
                 | LinArrow
-                  deriving (Show, Eq, Generic, Functor, Foldable, Traversable)
+                  deriving (Show, Eq, Ord, Generic, Functor, Foldable, Traversable)
 
 data LetAnn = PlainLet
             | InstanceLet
@@ -178,7 +183,7 @@ type Label = String
 -- fields is discarded (so both `{b:Z & a:X & a:Y}` and `{a:X & b:Z & a:Y}` map
 -- to `M.fromList [("a", NE.fromList [X, Y]), ("b", NE.fromList [Z])]` )
 newtype LabeledItems a = LabeledItems (M.Map Label (NE.NonEmpty a))
-  deriving (Eq, Show, Generic, Functor, Foldable, Traversable)
+  deriving (Eq, Ord, Show, Generic, Functor, Foldable, Traversable)
 
 labeledSingleton :: Label -> a -> LabeledItems a
 labeledSingleton label value = LabeledItems $ M.singleton label (value NE.:|[])
@@ -204,7 +209,7 @@ instance Monoid (LabeledItems a) where
 -- an ExtLabeledItems contains first the values in the (LabeledItems a) for that
 -- field, followed by the values in the (Maybe b) for that field if they exist.
 data ExtLabeledItems a b = Ext (LabeledItems a) (Maybe b)
-  deriving (Eq, Show, Generic)
+  deriving (Eq, Ord, Show, Generic)
 
 -- Adds more items to the front of an ExtLabeledItems.
 prefixExtLabeledItems :: LabeledItems a -> ExtLabeledItems a b -> ExtLabeledItems a b
@@ -291,7 +296,7 @@ data PrimTC e =
       | EffectRowKind
       | LabeledRowKindTC
       | ParIndexRange e e e  -- Full index set, global thread id, thread count
-        deriving (Show, Eq, Generic, Functor, Foldable, Traversable)
+        deriving (Show, Eq, Ord, Generic, Functor, Foldable, Traversable)
 
 data PrimCon e =
         Lit LitVal
@@ -308,7 +313,7 @@ data PrimCon e =
       | ConRef (PrimCon e)
       | RecordRef (LabeledItems e)
       | ParIndexCon e e        -- Type, value
-        deriving (Show, Eq, Generic, Functor, Foldable, Traversable)
+        deriving (Show, Eq, Ord, Generic, Functor, Foldable, Traversable)
 
 data PrimOp e =
         TabCon e [e]                 -- table type elements
@@ -363,12 +368,13 @@ data PrimHof e =
       | RunReader e e
       | RunWriter e
       | RunState  e e
+      | RunExcept e
       | Linearize e
       | Transpose e
       | PTileReduce e e       -- index set, thread body
         deriving (Show, Eq, Generic, Functor, Foldable, Traversable)
 
-data PrimEffect e = MAsk | MTell e | MGet | MPut e
+data PrimEffect e = MAsk | MTell e | MGet | MPut e | MThrow e
     deriving (Show, Eq, Generic, Functor, Foldable, Traversable)
 
 data BinOp = IAdd | ISub | IMul | IDiv | ICmp CmpOp
@@ -394,7 +400,7 @@ data ForAnn = RegularFor Direction | ParallelFor
 data Limit a = InclusiveLim a
              | ExclusiveLim a
              | Unlimited
-               deriving (Show, Eq, Generic, Functor, Foldable, Traversable)
+               deriving (Show, Eq, Ord, Generic, Functor, Foldable, Traversable)
 
 data ClassName = DataClass | VSpace | IdxSet | Eq | Ord deriving (Show, Eq, Generic)
 
@@ -413,14 +419,13 @@ primNameToStr prim = case lookup prim $ map swap $ M.toList builtinNames of
   Nothing -> show prim
 
 showPrimName :: PrimExpr e -> String
-showPrimName prim = primNameToStr $ fmap (const ()) prim
+showPrimName prim = primNameToStr $ void prim
 
 -- === effects ===
 
-type Effect = (EffectName, Name)
 data EffectRow = EffectRow [Effect] (Maybe Name)
-                 deriving (Show, Generic)
-data EffectName = Reader | Writer | State  deriving (Show, Eq, Ord, Generic)
+                 deriving (Ord, Show, Generic)
+data Effect = Reader Name | Writer Name | State Name | Except Type  deriving (Eq, Ord, Show, Generic)
 
 type EffectSummary = S.Set Effect
 
@@ -430,15 +435,21 @@ instance HasVars EffectSummary where
 instance Subst EffectSummary where
   subst (env, _) effs = S.map substEff effs
     where
-      substEff (eff, name) = case envLookup env name of
-        Just ~(Var (name':>_)) -> (eff, name')
-        Nothing               -> (eff, name)
+      substEff eff = case eff of
+        Reader name -> substEffName Reader name
+        Writer name -> substEffName Writer name
+        State name -> substEffName State name
+        _ -> eff
+      substEffName eff name = case envLookup env name of
+        Just (Var (name':>_)) -> eff name'
+        Just _                -> error "Expected effect name variable"
+        Nothing               -> eff name
 
 pattern Pure :: EffectRow
 pattern Pure = EffectRow [] Nothing
 
 pattern NoEffects :: EffectSummary
-pattern NoEffects <- ((S.null) -> True)
+pattern NoEffects <- (S.null -> True)
   where NoEffects = mempty
 
 instance Eq EffectRow where
@@ -960,13 +971,51 @@ instance Eq Atom where
   ProjectElt idxs v == ProjectElt idxs' v' = (idxs, v) == (idxs', v')
   _ == _ = False
 
+-- instance Ord (Abs b body) where
+--   compare (Abs b body) (Abs b' body') =
+--     compare b b' <> compare body body'
+
+-- {-
+instance Ord Atom where
+  compare (Var v) (Var v') = compare v v'
+  compare (Pi ab) (Pi ab') = compare ab ab'
+  compare (DataCon def params con args) (DataCon def' params' con' args') =
+    compare def def' <> compare params params' <> compare con con' <> compare args args'
+  compare (TypeCon def params) (TypeCon def' params') =
+    compare def def' <> compare params params'
+  compare (Variant lr l i v) (Variant lr' l' i' v') =
+    compare (lr, l, i, v) (lr', l', i', v')
+  compare (Record lr) (Record lr') =
+    compare lr lr'
+  compare (RecordTy lr) (RecordTy lr') =
+    compare lr lr'
+  compare (VariantTy lr) (VariantTy lr') =
+    compare lr lr'
+  compare (Con con) (Con con') =
+    compare con con'
+  compare (TC con) (TC con') =
+    compare con con'
+  compare (Eff eff) (Eff eff') =
+    compare eff eff'
+  compare _ _ = LT
+-- -}
+
 instance Eq DataDef where
   DataDef name _ _ == DataDef name' _ _ = name == name'
+
+instance Ord DataDef where
+  compare (DataDef name _ _) (DataDef name' _ _) =
+    compare name name'
 
 instance (Show a, Subst a, Eq a) => Eq (Abs Binder a) where
   Abs (Ignore a) b == Abs (Ignore a') b' = a == a' && b == b'
   ab == ab' = absArgType ab == absArgType ab' && applyAbs ab v == applyAbs ab' v
     where v = Var $ freshSkolemVar (ab, ab') (absArgType ab)
+
+instance (Show a, Subst a, Ord a) => Ord (Abs Binder a) where
+  -- compare (Abs (Ignore a) b) (Abs (Ignore a') b') =
+  compare (Abs b body) (Abs b' body') =
+    compare b b' <> compare body body'
 
 instance Eq (Nest Binder) where
   Empty == Empty = True
@@ -1165,7 +1214,11 @@ substName :: SubstEnv -> Name -> Name
 substName env v = case envLookup env (v:>()) of
   Nothing -> v
   Just (Var (v':>_)) -> v'
-  _ -> error "Should only substitute with a name"
+  Just (TC (BaseType (Scalar Float32Type))) ->
+    v
+    -- error $ "Found: " ++ show x
+  Just x -> error $ "Blah: " ++ show x
+  _ -> error $ "Should only substitute with a name:\n" ++ show v ++ "\n" ++ show env
 
 extendEffRow :: [Effect] -> EffectRow -> EffectRow
 extendEffRow effs (EffectRow effs' t) = EffectRow (effs <> effs') t
@@ -1496,6 +1549,7 @@ builtinNames = M.fromList
   , ("tell"       , OpExpr $ PrimEffect () $ MTell ())
   , ("get"        , OpExpr $ PrimEffect () $ MGet)
   , ("put"        , OpExpr $ PrimEffect () $ MPut  ())
+  , ("throw"      , OpExpr $ PrimEffect () $ MThrow ())
   , ("indexRef"   , OpExpr $ IndexRef () ())
   , ("inject"     , OpExpr $ Inject ())
   , ("select"     , OpExpr $ Select () () ())
@@ -1505,6 +1559,7 @@ builtinNames = M.fromList
   , ("runReader"       , HofExpr $ RunReader () ())
   , ("runWriter"       , HofExpr $ RunWriter    ())
   , ("runState"        , HofExpr $ RunState  () ())
+  , ("runExcept"       , HofExpr $ RunExcept    ())
   , ("tiled"           , HofExpr $ Tile 0 () ())
   , ("tiledd"          , HofExpr $ Tile 1 () ())
   , ("TyKind"  , TCExpr $ TypeKind)
@@ -1561,7 +1616,7 @@ instance Store Atom
 instance Store Expr
 instance Store Block
 instance Store Decl
-instance Store EffectName
+instance Store Effect
 instance Store EffectRow
 instance Store Direction
 instance Store UnOp

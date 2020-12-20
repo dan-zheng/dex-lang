@@ -214,7 +214,6 @@ def BToI (x:Bool) : Int  = W8ToI $ BToW8 x
 
 def BToF (x:Bool) : Float = IToF (BToI x)
 def todo (a:Type) ?-> : a = %throwError a
-def throw (a:Type) ?-> : a = %throwError a
 
 'Effects
 
@@ -392,7 +391,7 @@ def unsafeFromOrdinal (n : Type) (i : Int) : n = %unsafeFromOrdinal n i
 def fromOrdinal (n:Type) (i:Int) : n =
   case (0 <= i) && (i < size n) of
     True  -> unsafeFromOrdinal _ i
-    False -> throw
+    False -> todo
 
 def asidx (n:Type) ?-> (i:Int) : n = fromOrdinal n i
 def (@) (i:Int) (n:Type) : n = fromOrdinal n i
@@ -743,7 +742,7 @@ def logsoftmax (x: n=>Float) : n=>Float =
 
 def softmax (x: n=>Float) : n=>Float =
   m = maximum x
-  e =  for i. exp (x.i - m)
+  e = for i. exp (x.i - m)
   s = sum e
   for i. e.i / s
 
@@ -763,7 +762,7 @@ interface Monoid a:Type where
 'Length-erased lists
 
 data List a:Type =
-  AsList n:Int foo:(Fin n => a)
+  AsList n:Int elements:(Fin n => a)
 
 instance monoidList : Monoid (List a) where
   mempty = AsList _ []
@@ -1109,7 +1108,7 @@ def ptrToTab (n:Int) (ptr:Ptr Float) : Fin n => Float =
 def castTable (m:Type) (xs:n=>a) : m=>a =
   case size m == size n of
      True  -> for i. xs.(unsafeFromOrdinal _ (ordinal i))
-     False -> throw
+     False -> todo
 
 def reverse (x:n=>a) : n=>a =
   s = size n

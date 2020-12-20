@@ -15,6 +15,7 @@ import Text.Megaparsec hiding (Label, State)
 import Text.Megaparsec.Char hiding (space)
 import Data.Char (isLower)
 import Data.Functor
+import Data.List (intercalate)
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.Map.Strict as M
 import Data.Void
@@ -465,7 +466,7 @@ funDefLet = label "function definition" $ mayBreak $ do
   where
     arg :: Parser (UPat, UType, UArrow)
     arg = label "def arg" $ do
-      (p, ty) <-parens ((,) <$> pat <*> annot uType)
+      (p, ty) <- parens ((,) <$> pat <*> annot uType)
       arr <- arrow (return ()) <|> return (PlainArrow ())
       return (p, ty, arr)
 
@@ -487,15 +488,31 @@ effects :: Parser EffectRow
 effects = braces someEffects <|> return Pure
   where
     someEffects = do
-      effs <- liftM2 (,) effectName lowerName `sepBy` sym ","
+      -- effs <- liftM2 (,) effectName lowerName `sepBy` sym ","
+      -- v <- optional $ symbol "|" >> lowerName
+      effs <- liftM2 (,) effectName letterName `sepBy` sym ","
       v <- optional $ symbol "|" >> lowerName
       return $ EffectRow effs v
+      where
+        effect = liftM2 (,) effectName letterName `sepBy` sym ","
 
 effectName :: Parser EffectName
-effectName =     (keyWord WriteKW $> Writer)
-             <|> (keyWord ReadKW  $> Reader)
-             <|> (keyWord StateKW $> State)
-             <?> "effect name (Accum|Read|State)"
+effectName = parameterizedEffectName <|> nonparameterizedEffectName
+
+parameterizedEffectName :: Parser EffectName
+parameterizedEffectName =
+      (keyWord WriteKW  $> Writer)
+  <|> (keyWord ReadKW   $> Reader)
+  <|> (keyWord StateKW  $> State)
+  <|> (keyWord ExceptKW $> Except)
+  <?> "effect name (" ++ effectNames ++ ")"
+    where effectNames = intercalate "|" effectKeyWordStrs
+
+nonparameterizedEffectName :: Parser EffectName
+nonparameterizedEffectName =
+  (keyWord ExceptKW $> Except)
+  <?> "effect name (" ++ effectNames ++ ")"
+    where effectNames = intercalate "|" effectKeyWordStrs
 
 uLamExpr :: Parser UExpr
 uLamExpr = do
@@ -1016,8 +1033,9 @@ mkInterfaceConsName =
 type Lexer = Parser
 
 data KeyWord = DefKW | ForKW | For_KW | RofKW | Rof_KW | CaseKW | OfKW
-             | ReadKW | WriteKW | StateKW | DataKW | InterfaceKW
-             | InstanceKW | WhereKW | IfKW | ThenKW | ElseKW
+             | ReadKW | WriteKW | StateKW | ExceptKW
+             | DataKW | InterfaceKW | InstanceKW
+             | WhereKW | IfKW | ThenKW | ElseKW
 
 upperName :: Lexer Name
 upperName = liftM mkName $ label "upper-case name" $ lexeme $
@@ -1026,6 +1044,10 @@ upperName = liftM mkName $ label "upper-case name" $ lexeme $
 lowerName  :: Lexer Name
 lowerName = liftM mkName $ label "lower-case name" $ lexeme $
   checkNotKeyword $ (:) <$> lowerChar <*> many nameTailChar
+
+letterName  :: Lexer Name
+letterName = liftM mkName $ label "identifier name" $ lexeme $
+  checkNotKeyword $ (:) <$> letterChar <*> many nameTailChar
 
 checkNotKeyword :: Parser String -> Parser String
 checkNotKeyword p = try $ do
@@ -1047,18 +1069,22 @@ keyWord kw = lexeme $ try $ string s >> notFollowedBy nameTailChar
       ThenKW -> "then"
       ElseKW -> "else"
       OfKW   -> "of"
-      ReadKW  -> "Read"
-      WriteKW -> "Accum"
-      StateKW -> "State"
+      ReadKW   -> "Read"
+      WriteKW  -> "Accum"
+      StateKW  -> "State"
+      ExceptKW -> "Except"
       DataKW -> "data"
       InterfaceKW -> "interface"
       InstanceKW -> "instance"
       WhereKW -> "where"
 
+effectKeyWordStrs :: [String]
+effectKeyWordStrs = ["Read", "Write", "Accum", "Except"]
+
 keyWordStrs :: [String]
 keyWordStrs = ["def", "for", "for_", "rof", "rof_", "case", "of", "llam",
-               "Read", "Write", "Accum", "data", "interface",
-               "instance", "where", "if", "then", "else"]
+               "data", "interface", "instance", "where", "if", "then", "else"]
+               ++ effectKeyWordStrs
 
 fieldLabel :: Lexer Label
 fieldLabel = label "field label" $ lexeme $

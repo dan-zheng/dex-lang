@@ -20,6 +20,7 @@ import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as M
 import Data.String (fromString)
 import Data.Text.Prettyprint.Doc
+import Debug.Trace
 
 import Syntax
 import Interpreter (indicesNoIO)
@@ -400,8 +401,41 @@ checkUEff (EffectRow effs t) = do
    where
      lookupVarName :: Type -> Name -> UInferM Name
      lookupVarName ty v = do
-       -- TODO: more graceful errors on error
        Var (v':>ty') <- asks (!(v:>()))
+       {-
+       asdfasdf <- ask
+       scope <- getScope
+       let vGlobal = asGlobal v
+       -- let blah = envLookup scope (vGlobal:>())
+       let blah = envLookup asdfasdf (vGlobal:>())
+       -- THIS IS FUNDAMENTALLY HARD BECAUSE EFFECTS JUST CARRY A NAME, NOT A FULL TYPE.
+       -- `Name` needs to become `UType`
+       -- whatever <- reduceScoped $ withEffects Pure $ blah
+
+       -- TODO: more graceful errors on error
+
+       -- Var (v':>ty') <- asks (!(v:>()))
+       -- let globalName = asGlobal v
+       -- let globalVar = globalName:>()
+       -- env <- ask
+       -- let localAtom = envLookup env (v:>())
+       -- let globalAtom = envLookup env (asGlobal v:> ())
+       -- Just (Var (v':>ty')) <- asks (\env -> envLookup env (v:>()) <|> envLookup env (asGlobal v:>()))
+       -- reduced <- reduceScoped $ withEffects Pure $ return ty
+       -- reduced <- reduceScoped $ withEffects Pure $ checkRho _ ty
+
+       atom <- asks (\env -> envLookup env (v:>()) <|> envLookup env (asGlobal v:>()))
+       let Just (Var (v':>ty')) = trace ("SHOW LOOKUP VAR NAME: " ++ show v ++ ", ATOM: " ++ show atom ++ ", TYPE: " ++ show ty ++ ", REDUCED: " ++ show blah) atom
+       -- maybe :: b -> (a -> b) -> Maybe a -> b
+       -- let aldsjfalf = maybe globalAtom Just localAtom
+       -- let atom = localAtom <|> globalAtom
+       -- let dataCon = lookupDataCon v
+       -- test <- dataCon
+       -- let foo = asks (!(v:>()))
+       -- atom <- foo
+       -- let foo = trace ("Found atom: " ++ show atom ++ ", global con? " ++ show globalAtom) atom
+       -- let Var (v':>ty') = atom
+       -}
        constrainEq ty ty'
        return v'
 
