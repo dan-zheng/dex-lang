@@ -72,7 +72,7 @@ type DriverM = ReaderT DriverCfg
                    (Actor SourceContents))
 
 runDriver :: DriverCfg -> Actor SourceContents ()
-runDriver cfg = liftM fst $ flip runCatT mempty $ flip runReaderT cfg $
+runDriver cfg = fmap fst $ flip runCatT mempty $ flip runReaderT cfg $
                   forever $ receive >>= evalSource
 
 evalSource :: SourceContents -> DriverM ()
@@ -92,7 +92,7 @@ sourceBlockToDag block = do
   -- TODO: Stop forcing dependencies on all preceding blocks. This will require
   --       an improvement of the analysis above, such that all blocks depend on those
   --       that contain interface instance definitions.
-  extend $ (foldMap ((@>n) . Bind) $ envAsVars $ boundUVars block, [n])
+  extend $foldMap ((@>n) . Bind) $ envAsVars $ boundUVars block, [n])
   case sbContents block of
     IncludeSourceFile _ -> extend $ asSnd [n]
     _ -> return ()
@@ -204,7 +204,7 @@ displayResultsTerm reqChan =
      c <- myChan
      send reqChan $ subChan Left c
      void $ spawn Trap $ monitorKeyboard $ subChan Right c
-     forever $ termDisplayLoop
+     forever termDisplayLoop
 
 termDisplayLoop :: TermDisplayM ()
 termDisplayLoop = do
@@ -274,10 +274,14 @@ onmod fname action = do
 
 -- === DAG utils ===
 
+-- | A @Node a@ is a pair of an @a@ and a list of neighbor node ids.
 type Node a = (a, [NodeId])
-data Dag a = Dag (M.Map NodeId (Node a)) (M.Map (a, [NodeId]) NodeId)
 
--- returns the addition only, not the new DAG
+-- | A @Dag a@ is a bidirectional map from node ids to nodes.
+data Dag a = Dag (M.Map NodeId (Node a)) (M.Map (Node a) NodeId)
+
+-- | Adds a node to a DAG.
+-- |Returns the added node id and a DAG representing the addition.
 addToDag :: Ord a => Dag a -> Node a -> (NodeId, Dag a)
 addToDag (Dag _ m) node =
   case M.lookup node m of
