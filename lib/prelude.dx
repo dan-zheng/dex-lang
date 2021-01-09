@@ -1472,8 +1472,32 @@ def linearSearch [Eq a] (xs:n=>a) (query:a) : Maybe n =
 
 def listLength ((AsList n _):List a) : Int = n
 
--- This is for efficiency (rather than using `<>` repeatedly)
--- TODO: we want this for any monoid but this implementation won't work.
+-- Combinator for efficient List-returning functions
+-- def combinator (sizeComputer:a -> n) () : List a =
+
+-- New type system feature: no way to say "Table of sizes" and "array w
+-- Missing sizes in types
+
+-- Isomorphic to function taking array of list.
+-- Dougal: unzipping.
+-- - Array of pairs ~ pair of arrays
+-- - But array of dependent pairs ~ dependent pair of arrays.
+--   - Dependence is more subtle, includes indexing (dependence on elements)
+--   - May need AD of dynamic loops
+--     - To capture values from forward pass to backward pass: need this
+--     - Possible with unsafe casts: sizes are not unknown
+--
+-- Dan: is there type system trickiness (like ProjectElt)?
+-- - Types need to be reducible to normal form
+-- - Normal form is robust for substitution (progress and preservation)
+-- - Normalization syntactic constraint in the compiler: types (Atom) cannot have application
+--   - Dan: can this be worked around via defining a local value?
+--   - Daniel added ProjectElt (restricted function applications)
+-- - Code generation?
+--   - Array of pointers enables parallelization, no dependence
+--   - For "known arrays of arrays of different sizes": codegen could be more efficient
+-- def foo (sizes: n => Int) (array: (i:n) => sizes.i => a) : 
+
 def concat (lists:n=>(List a)) : List a =
   totalSize = sum for i. listLength lists.i
   AsList _ $ withState 0 \listIdx.

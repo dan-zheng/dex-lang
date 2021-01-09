@@ -847,6 +847,8 @@ synthDict ty = do
 superclass :: Atom -> SynthDictM Atom
 superclass dict = return dict <|> do
   (f, LetBound SuperclassLet _) <- getBinding
+  -- use List as Monad, write code like operating on single examples, nondeterministic programming
+  -- vmap has fixed size, but monad enables branching (cartesian products)
   inferToSynth $ tryApply f dict
 
 getBinding :: SynthDictM (Atom, BinderInfo)
@@ -863,6 +865,8 @@ inferToSynth m = do
     Right (x, (_, decls)) -> do
       mapM_ emitDecl decls
       return x
+
+-- end of dictionary synthesis
 
 tryApply :: Atom -> Atom -> UInferM Atom
 tryApply f x = do

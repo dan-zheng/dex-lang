@@ -56,6 +56,9 @@ import Type
 import PPrint
 import Util (bindM2, scanM, restructure)
 
+-- Builder type
+-- EmbedEnvR: reader
+-- EmbedEnvC: concatenate
 newtype EmbedT m a = EmbedT (ReaderT EmbedEnvR (CatT EmbedEnvC m) a)
   deriving (Functor, Applicative, Monad, MonadIO, MonadFail, Alternative)
 
@@ -68,6 +71,8 @@ type SubstEmbed    = SubstEmbedT Identity
 -- Carries the vars in scope (with optional definitions) and the emitted decls
 type EmbedEnvC = (Scope, Nest Decl)
 -- Carries a name suggestion and the allowable effects
+-- Shows: Dex effects in scope, name hint
+-- - IRs are easier to debug if IR has names matching what exists in the source: tmp1, v1, etc
 type EmbedEnvR = (Tag, EffectRow)
 
 runEmbedT :: Monad m => EmbedT m a -> Scope -> m (a, EmbedEnvC)
@@ -496,6 +501,7 @@ indexAsInt idx = emitOp $ ToOrdinal idx
 instance MonadTrans EmbedT where
   lift m = EmbedT $ lift $ lift m
 
+-- Builder typeclass
 class Monad m => MonadEmbed m where
   embedLook   :: m EmbedEnvC
   embedExtend :: EmbedEnvC -> m ()
