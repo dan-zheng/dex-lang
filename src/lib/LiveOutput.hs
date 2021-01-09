@@ -267,7 +267,7 @@ onmod fname action = do
   void $ forkIO $ loop t
   where
     loop t = do
-      t' <- getModificationTime fname
+      t' <- getModificationTime fname -- TODO: maybe this is the source of the macOS bug, catch the error here (throw IOError, returns Maybe a instead) - keep waiting. Example in Prelude for catching IOException
       threadDelay 100000
       unless (t == t') action
       loop t'

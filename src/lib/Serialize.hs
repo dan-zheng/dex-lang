@@ -38,6 +38,7 @@ getDexString x = error $ "Not a string: " ++ pprint x
 
 -- Pretty-print values, e.g. for displaying in the REPL.
 -- This doesn't handle parentheses well. TODO: treat it more like PrettyPrec
+-- IO Monad: enables reading from tables
 prettyVal :: Val -> IO (Doc ann)
 prettyVal val = case val of
   -- Pretty-print tables.
