@@ -24,6 +24,7 @@ import Syntax
 import PPrint
 import Parser
 import Serialize ()
+import Debug.Trace
 
 pprintHtml :: ToMarkup a => a -> String
 pprintHtml x = renderHtml $ toMarkup x
@@ -57,7 +58,10 @@ instance ToMarkup SourceBlock where
     _ -> cdiv "code-block" $ highlightSyntax (pprint block)
 
 mdToHtml :: String -> Html
-mdToHtml s = preEscapedText $ commonmarkToHtml [] $ pack s
+-- mdToHtml s = preEscapedText $ commonmarkToHtml [] $ pack s
+mdToHtml s =
+  let result = preEscapedText $ commonmarkToHtml [] $ pack s in
+  trace ("Rendered HTML: " ++ show (pprintHtml result)) result
 
 cdiv :: String -> Html -> Html
 cdiv c inner = H.div inner ! class_ (stringValue c)
