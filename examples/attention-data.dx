@@ -1,0 +1,271 @@
+' # Attention
+
+' End-to-end implementation of attention in Dex for seq2seq translation, including data loading.
+
+' Adapted from [this PyTorch notebook](https://pytorch.org/tutorials/intermediate/seq2seq_translation_tutorial.html).
+
+' Perhaps there is opportunity to copy code from [@srush's implementation of attention/transformers in Dex](https://github.com/srush/learns-dex/blob/main/transformer.dx).
+
+' ## Helpers
+
+' ### General
+
+def listTable ((AsList n xs):List a) : (Fin n)=>a = xs
+
+-- def filter (f:a->{|eff} Bool) (list: List a) : {|eff} List a =
+def filter (f:a->Bool) (list: List a) : List a =
+  (AsList _ xs) = list
+  init = toList []
+  yieldState init \ref. for i.
+    bool = f xs.i
+    case f xs.i of
+      True -> ref := get ref <> toList [xs.i]
+      False -> ()
+
+def even (x:Int) : Bool =
+  mod x 2 == 0
+
+def odd (x:Int) : Bool =
+  mod x 2 == 1
+
+filter odd $ toList (iota (Fin 10))
+
+filter even $ toList (iota (Fin 10))
+
+' ### List utilities
+
+def mapList (f:a->{|eff} b) (list:List a) : {|eff} (List b) =
+  (AsList _ xs) = list
+  toList $ map f xs
+  
+
+' ### String splitting
+
+-- TODO: Implement character literals? Foreshadows Unicode trickiness.
+-- whitespace : Char = ' '
+whitespaceChar : Char =
+  (AsList _ space) = " "
+  head space
+
+tabChar : Char =
+  (AsList _ tab) = "\t"
+  head tab
+
+-- tabChar : Char =
+--   tabString = "\t"
+--   tab = listTable tabString
+--   head tab
+
+newlineChar : Char =
+  (AsList _ newline) = "\n"
+  head newline
+
+def isSpace (c: Char) : Bool =
+  whitespaceChar == c
+
+' ### List operations
+
+def last (xs:n=>a) : a =
+  lastIndex = (size n) - 1
+  xs.(lastIndex@_)
+
+last ([] : _ => Int)
+
+last [1, 2, 3]
+
+-- Takes the first n elements.
+def take (n:Type) ?-> (xs:n=>a) (count:Int) : List a =
+  numElts = min count (size n)
+  toList $ slice xs 0 (Range 0 numElts)
+
+take [1, 2, 3, 4, 5] 2
+
+take [1, 2, 3, 4, 5] 6
+
+-- Drops the first n elements.
+def drop (n:Type) ?-> (xs:n=>a) (count:Int) : List a =
+  length = size n
+  numElts = max (length - count) 0
+  toList $ slice xs numElts (Range numElts length)
+
+drop [1, 2, 3, 4, 5] 2
+
+drop [1, 2, 3, 4, 5] 6
+
+-- Drops the last n elements.
+def dropLast (n:Type) ?-> (xs:n=>a) (count:Int) : List a =
+  numElts = max (size n - count) 0
+  toList $ slice xs 0 (Range 0 numElts)
+
+dropLast [1, 2, 3, 4, 5] 2
+
+dropLast [1, 2, 3, 4, 5] 6
+
+-- Adam: Dex lists are not:
+-- - Like Haskell: linked lists
+--   - Good for reading, bad for writing (need to copy all elements)
+--   - `cons` leads to quadratic performance
+--   - Similar to Python: immutable strings. Incremental string addition uses a different API
+-- - Like C++: fast mutation
+--   - Dougal: should be like C++. Need to access one of these performance models.
+--   - One-liner summary: Dex is Haskell types (semantics?) with C++ performance model.
+--
+-- TODO: add a string tutorial
+-- Takes a long time to write tutorials
+--
+-- Language reference
+-- - Adam: this would still be valuable.
+-- - Last langauge reference is so old: before dependently-typed rewrite.
+-- - New rewrites are more localized. No super dramatic changes recently.
+-- - Add doctests: verified ideas.
+--
+-- See `concat` in the prelude.
+-- - Allocate an empty list, fills it one by one.
+-- - Summary of technique: pre-allocation?
+-- - Different monoid for exponentially-sized list
+--
+-- Dex: possible to fix via Writer effect
+-- - 
+
+-- cons prepends x to xs.
+def cons (x:a) (xs:List a) : List a =
+  toList [x] <> xs
+
+-- snoc appends x to xs.
+def snoc (xs:List a) (x:a) : List a =
+  xs <> toList [x]
+
+def takeWhile (f:a->Bool) (list:List a) : List a =
+  (AsList size xs) = list
+  yieldState mempty \ref. iter \i.
+    if i == size
+      then Done (get ref)
+      else
+        x = xs.(i@_)
+        if f x
+          then
+            ref := snoc (get ref) x
+            Continue
+          else
+            Done (get ref)
+
+def dropWhile (f:a->Bool) (list:List a) : List a =
+  (AsList size xs) = list
+  -- Find index of first element that does not satisfy predicate.
+  dropIndex = iter \i.
+    if i == size
+      then Done size
+
+      else
+        if not $ f xs.(i@_)
+          then
+            unsafeIO do print $ show i
+            Done i
+          else Continue
+  -- Drop elements before index.
+  tail xs dropIndex
+
+takeWhile (\x. x < 3) $ toList (iota (Fin 10))
+
+dropWhile (\x. x < 3) $ toList (iota (Fin 10))
+
+def span (f:a->Bool) (list:List a) : (List a & List a) =
+  (takeWhile f list, dropWhile f list)
+
+def break (f:a->Bool) (list:List a) : (List a & List a) =
+  span (\x. not $ f x) list
+
+span (\x. x < 3) $ toList [1, 2, 3, 4]
+
+break (\x. x == 3) $ toList [1, 2, 3, 4]
+
+-- Note: implementation is WRONG. Does not group together non-delimited characters.
+-- def split (s:String) (delimiter:Char) : List String =
+--   init : List String = toList []
+--   (AsList inputSize s') = s
+--   indices : List Int = (AsList _ (iota (Fin inputSize)))
+--   delimiterIndices = filter (\i: Int. s'.(i@_) == delimiter) indices
+--   yieldState init \ref. for i.
+--     case s'.i == delimiter of
+--       True -> ()
+--       False -> ref := get ref <> toList [toList [s'.i]]
+
+def Vector (a:Type) 
+
+def split (s:String) (delimiter:Char) : List String =
+  -- Challenge of working with lists: size is not known.
+  -- Potential solution: `ArrayList` (`std::vector`, `std::string`)?
+  -- - Amortized O(1): push and pop
+  -- - Question: `std::deque`?
+  -- - Implementation: blocked by no way to write to lists
+  --   - David: wants a stack to simulate recursion
+  --   - Extension: parallel implementation?
+  -- - Three passes for List?
+  --   - Counting through number of splits
+  --   - Make table of that size to hold sizes of each line
+  --   - Make actual lists of the characters
+  -- List String: array of pointers to `char *` arrays
+  (AsList _ cs) = s
+  init = mempty
+  yieldState init \words.
+    yieldState True \isNewWord. for i.
+      c = cs.i
+      case c == delimiter of
+        True ->
+          isNewWord := True
+        False ->
+          words' = get words
+          case get isNewWord of
+            True  -> words := words' <> toList [toList [c]]
+            False ->
+              (AsList _ wordsTab) = words'
+              updatedWord = toList [(last wordsTab <> toList [c])]
+              words := dropLast wordsTab 1 <> updatedWord
+              -- words := toList wordsTab <> updatedWord
+          isNewWord := False
+
+def splitNewline (s:String) : List String =
+  split s newlineChar
+
+-- def splitNewline (s:String) : List String =
+--   unsafeIO do
+--     withTempFile \tmpFile.
+--       writeFile tmpFile s
+--       x = readFile tmpFile
+--       -- print x
+--       toList [x]
+--       -- shellOut $ "read
+
+split "aa b c d" whitespaceChar
+
+exampleString = "a b\tc d\ne f\tg h\ni j\tk l"
+
+:p exampleString
+
+lines = splitNewline exampleString
+
+:p lines
+
+mapList (\s. split s tabChar) lines
+
+' ## Data loading
+
+' Training data [`eng-fra.txt`](https://github.com/L1aoXingyu/seq2seq-translation/blob/master/data/eng-fra.txt) is 9.1 MB. It contains English-French sentence pairs.
+
+-- dataFile = unsafeIO do fopen "eng-fra.txt" ReadMode
+
+inputDataFile = unsafeIO do readFile "eng-fra.txt"
+
+(AsList _ inputData) = inputDataFile
+
+:t inputData
+
+-- Input sizes much greater than 10000 take too long to execute.
+inputData' = take inputData 10000
+
+%time
+sentencePairs = splitNewline inputData'
+
+:t sentencePairs
+
+:p sentencePairs
