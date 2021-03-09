@@ -5,7 +5,6 @@
 -- https://developers.google.com/open-source/licenses/bsd
 
 module LLVM.Shims (
-  SymbolResolver (..), newSymbolResolver, disposeSymbolResolver,
   newTargetMachine, newHostTargetMachine, disposeTargetMachine,
   ) where
 
@@ -25,26 +24,6 @@ import qualified LLVM.Internal.Target as Target
 import qualified LLVM.Internal.FFI.Target as Target.FFI
 import LLVM.Prelude (ShortByteString, ByteString)
 import LLVM.Internal.Coding (encodeM, decodeM)
-
--- llvm-hs doesn't expose any way to manage the symbol resolvers in a non-bracketed way
-
-type FFIResolver = CString -> Ptr OrcJIT.FFI.JITSymbol -> IO ()
-foreign import ccall "wrapper" wrapFFIResolver :: FFIResolver -> IO (FunPtr FFIResolver)
-data SymbolResolver = SymbolResolver (FunPtr FFIResolver) (Ptr OrcJIT.FFI.SymbolResolver)
-
--- | Create a `FFI.SymbolResolver` that can be used with the JIT.
-newSymbolResolver :: OrcJIT.ExecutionSession -> OrcJIT.SymbolResolver -> IO SymbolResolver
-newSymbolResolver (OrcJIT.ExecutionSession session) (OrcJIT.SymbolResolver resolverFn) = do
-  ffiResolverPtr <- wrapFFIResolver \sym res -> do
-    f <- encodeM =<< resolverFn =<< decodeM sym
-    f res
-  lambdaResolver <- OrcJIT.FFI.createLambdaResolver session ffiResolverPtr
-  return $ SymbolResolver ffiResolverPtr lambdaResolver
-
-disposeSymbolResolver :: SymbolResolver -> IO ()
-disposeSymbolResolver (SymbolResolver wrapper resolver) = do
-  OrcJIT.FFI.disposeSymbolResolver resolver
-  freeHaskellFunPtr wrapper
 
 -- llvm-hs doesn't expose any way to manage target machines in a non-bracketed way
 

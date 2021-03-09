@@ -11,7 +11,10 @@ from typing import List
 
 here = pathlib.Path(__file__).parent.absolute()
 
-lib = ctypes.cdll.LoadLibrary(here / 'libDex.so')
+# FIXME(llvm-12): Shared library suffix is platform-dependent: .so vs .dylib.
+# Add platform-dependent logic to select the right one.
+# lib = ctypes.cdll.LoadLibrary(here / 'libDex.so')
+lib = ctypes.cdll.LoadLibrary(here / 'libDex.dylib')
 
 def tagged_union(name: str, members: List[type]):
   named_members = [(f"t{i}", member) for i, member in enumerate(members)]

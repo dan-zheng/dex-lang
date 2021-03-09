@@ -1,4 +1,4 @@
-# Copyright 2019 Google LLC
+# Copyright 2020 Google LLC
 #
 # Use of this source code is governed by a BSD-style
 # license that can be found in the LICENSE file or at
@@ -10,8 +10,9 @@ packages:
 - .
 
 extra-deps:
-  - github: apaszke/llvm-hs
-    commit: a9a74be1a7c15f3d21b2fffd35a425002ae7736f
+  # TODO: Point to llvm-hs/llvm-hs after upstreaming to llvm-hs@llvm12.
+  - github: dan-zheng/llvm-hs
+    commit: 280c3481d202b9c72a9d2320789d04c1374ca7d7
     subdirs:
       - llvm-hs
       - llvm-hs-pure
