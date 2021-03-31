@@ -7,10 +7,17 @@
 import ctypes
 import pathlib
 import atexit
+import sys
 from pkg_resources import resource_filename
 from typing import List
 
-lib = ctypes.cdll.LoadLibrary(resource_filename('dex', 'libDex.so'))
+def shared_library(name):
+  """Returns a full shared library name with a platform-specific extension."""
+  if sys.platform == 'darwin':
+    return f"{name}.dylib"
+  return f"{name}.so"
+
+lib = ctypes.cdll.LoadLibrary(resource_filename('dex', shared_library('libDex')))
 
 def tagged_union(name: str, members: List[type]):
   named_members = [(f"t{i}", member) for i, member in enumerate(members)]
